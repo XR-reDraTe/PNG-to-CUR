@@ -1,0 +1,14 @@
+D:\VS Code Programs\PNG2CUR\bin\Debug\net10.0-windows\PNG2CUR.exe
+D:\VS Code Programs\PNG2CUR\bin\Debug\net10.0-windows\PNG2CUR.deps.json
+D:\VS Code Programs\PNG2CUR\bin\Debug\net10.0-windows\PNG2CUR.runtimeconfig.json
+D:\VS Code Programs\PNG2CUR\bin\Debug\net10.0-windows\PNG2CUR.dll
+D:\VS Code Programs\PNG2CUR\bin\Debug\net10.0-windows\PNG2CUR.pdb
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.GeneratedMSBuildEditorConfig.editorconfig
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.AssemblyInfoInputs.cache
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.AssemblyInfo.cs
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.csproj.CoreCompileInputs.cache
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.dll
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\refint\PNG2CUR.dll
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.pdb
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\PNG2CUR.genruntimeconfig.cache
+D:\VS Code Programs\PNG2CUR\obj\Debug\net10.0-windows\ref\PNG2CUR.dll
