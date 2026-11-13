@@ -11,7 +11,7 @@ namespace PNG2CUR
     {
         private PictureBox previewBox;
         private NumericUpDown hotXNum, hotYNum;
-        private Button selectBtn, convertBtn;
+        private Button selectBtn, convertBtn, batchConvertBtn;
         private Label lblHot, lblHotY;
         private string pngPath = "";
         private const int MaxSize = 256; // Windows 光标最大尺寸
@@ -19,7 +19,7 @@ namespace PNG2CUR
         public Form1()
         {
             Text = "[PNG to CUR Converter]";
-            Size = new Size(400, 258);
+            Size = new Size(320, 300);
             Padding = new Padding(12);
 
             selectBtn = new Button { Text = "Select PNG image", Location = new Point(12, 12), Width = 100 };
@@ -28,17 +28,22 @@ namespace PNG2CUR
             previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 12), Size = new Size(160, 160),
                                         BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom };
 
-            Label lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(210, 40), AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-            lblHot = new Label { Text = "X:", Location = new Point(210, 65), AutoSize = true };
-            hotXNum = new NumericUpDown { Location = new Point(260, 65), Width = 60, Minimum = 0, Maximum = 255 };
-            lblHotY = new Label { Text = "Y:", Location = new Point(210, 90), AutoSize = true };
-            hotYNum = new NumericUpDown { Location = new Point(260, 90), Width = 60, Minimum = 0, Maximum = 255 };
+            Label lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(182, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            lblHot = new Label { Text = "X:", Location = new Point(182, 70), AutoSize = true };
+            hotXNum = new NumericUpDown { Location = new Point(210, 70), Width = 60, Minimum = 0, Maximum = 255 };
+            lblHotY = new Label { Text = "Y:", Location = new Point(182, 95), AutoSize = true };
+            hotYNum = new NumericUpDown { Location = new Point(210, 95), Width = 60, Minimum = 0, Maximum = 255 };
 
             convertBtn = new Button { Text = "Convert to CUR file", Location = new Point(210, 125), AutoSize = false, Size = new Size(125, 30) };
             convertBtn.Click += ConvertClick;
             convertBtn.Enabled = false;
 
-            Controls.AddRange(new Control[] { selectBtn, previewBox, lblHotTitle, lblHot, hotXNum, lblHotY, hotYNum, convertBtn });
+            batchConvertBtn = new Button { Text = "Multi convert", Location = new Point(selectBtn.Right + 12, 12), Width = 110 };
+            batchConvertBtn.Click += BatchConvertClick;
+
+            convertBtn.Location = new Point(previewBox.Left, previewBox.Bottom + 12);
+
+            Controls.AddRange(new Control[] { selectBtn, batchConvertBtn, previewBox, lblHotTitle, lblHot, hotXNum, lblHotY, hotYNum, convertBtn });
         }
 
         private void SelectPng(object? sender, EventArgs e)
@@ -104,6 +109,75 @@ namespace PNG2CUR
             {
                 MessageBox.Show("Failed to convert: " + ex.Message, "[Error]");
             }
+        }
+
+        private void BatchConvertClick(object? sender, EventArgs e)
+        {
+            using var ofd = new OpenFileDialog
+            {
+                Filter = "PNG Image|*.png",
+                Multiselect = true,
+                Title = "Select PNG images to convert"
+            };
+            if (ofd.ShowDialog(this) != DialogResult.OK) return;
+
+            using var fbd = new FolderBrowserDialog { Description = "Select the output folder for CUR files" };
+            if (fbd.ShowDialog(this) != DialogResult.OK) return;
+
+            int hotX = (int)hotXNum.Value;
+            int hotY = (int)hotYNum.Value;
+            int convertedCount = 0;
+            var failures = new System.Collections.Generic.List<string>();
+
+            foreach (string sourcePath in ofd.FileNames)
+            {
+                string fileName = Path.GetFileName(sourcePath);
+                try
+                {
+                    int imageWidth;
+                    int imageHeight;
+                    using (var image = Image.FromFile(sourcePath))
+                    {
+                        imageWidth = image.Width;
+                        imageHeight = image.Height;
+                    }
+
+                    if (imageWidth > MaxSize || imageHeight > MaxSize)
+                    {
+                        failures.Add($"{fileName}: image exceeds the maximum size of {MaxSize}x{MaxSize}.");
+                        continue;
+                    }
+
+                    if (hotX >= imageWidth || hotY >= imageHeight)
+                    {
+                        failures.Add($"{fileName}: hotspot coordinates are outside the image bounds.");
+                        continue;
+                    }
+
+                    string destinationPath = Path.Combine(fbd.SelectedPath, Path.GetFileNameWithoutExtension(sourcePath) + ".cur");
+                    if (File.Exists(destinationPath))
+                    {
+                        failures.Add($"{fileName}: output file already exists ({Path.GetFileName(destinationPath)}).");
+                        continue;
+                    }
+
+                    PngToCurConverter.Convert(sourcePath, destinationPath, hotX, hotY);
+                    convertedCount++;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{fileName}: {ex.Message}");
+                }
+            }
+
+            if (failures.Count == 0)
+            {
+                MessageBox.Show($"Successfully converted {convertedCount} file(s).", "[Success]");
+                return;
+            }
+
+            string message = $"Converted: {convertedCount}\nFailed: {failures.Count}\n\n" + string.Join(Environment.NewLine, failures);
+            MessageBox.Show(message, "[Batch conversion results]");
         }
     }
 
