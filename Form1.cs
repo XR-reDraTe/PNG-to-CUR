@@ -4,82 +4,202 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace PNG2CUR
 {
     public partial class Form1 : Form
     {
+        private const int DwmwaUseImmersiveDarkMode = 20;
+        private const int DwmwaCaptionColor = 35;
+        private const int DwmwaTextColor = 36;
+        private readonly List<Image> controlImages = new();
+
         private PictureBox previewBox;
         private NumericUpDown hotXNum, hotYNum;
-        private Button selectBtn, convertBtn, batchConvertBtn;
+        private Button selectBtn, convertBtn, batchConvertBtn, previousImageBtn, nextImageBtn;
         private Label lblHot, lblHotY;
         private string pngPath = "";
+        private string[] previewPaths = Array.Empty<string>();
+        private int previewIndex;
         private const int MaxSize = 256; // Windows 光标最大尺寸
 
         public Form1()
         {
             Text = "[PNG to CUR Converter]";
-            Size = new Size(320, 300);
+            BackgroundImage = LoadControlImage("bg.png");
+            BackgroundImageLayout = ImageLayout.Stretch;
+            ClientSize = new Size(350, 300);
             Padding = new Padding(12);
+            Disposed += (_, _) =>
+            {
+                foreach (Image image in controlImages)
+                {
+                    image.Dispose();
+                }
+            };
 
-            selectBtn = new Button { Text = "Select PNG image", Location = new Point(12, 12), Width = 100 };
+            selectBtn = new Button
+            {
+                Text = "Select PNG image",
+                Location = new Point(12, 12),
+                Width = 100,
+                BackgroundImage = LoadControlImage("selectBtn.png"),
+                BackgroundImageLayout = ImageLayout.Stretch,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                ForeColor = Color.Black
+            };
+            selectBtn.FlatAppearance.BorderSize = 0;
             selectBtn.Click += SelectPng;
 
             previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 12), Size = new Size(160, 160),
-                                        BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom };
+                                        BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom,
+                                        BackgroundImage = LoadControlImage("previewBox.png"), BackgroundImageLayout = ImageLayout.Stretch };
 
-            Label lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(182, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-            lblHot = new Label { Text = "X:", Location = new Point(182, 70), AutoSize = true };
-            hotXNum = new NumericUpDown { Location = new Point(210, 70), Width = 60, Minimum = 0, Maximum = 255 };
-            lblHotY = new Label { Text = "Y:", Location = new Point(182, 95), AutoSize = true };
-            hotYNum = new NumericUpDown { Location = new Point(210, 95), Width = 60, Minimum = 0, Maximum = 255 };
+            previousImageBtn = new Button
+            {
+                Text = "↑",
+                Location = new Point(180, 82),
+                Size = new Size(32, 32),
+                BackColor = Color.FromArgb(148, 148, 148),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false
+            };
+            previousImageBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+            previousImageBtn.Click += PreviousImageClick;
 
-            convertBtn = new Button { Text = "Convert to CUR file", Location = new Point(210, 125), AutoSize = false, Size = new Size(125, 30) };
+            nextImageBtn = new Button
+            {
+                Text = "↓",
+                Location = new Point(180, 122),
+                Size = new Size(32, 32),
+                BackColor = Color.FromArgb(148, 148, 148),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false
+            };
+            nextImageBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+            nextImageBtn.Click += NextImageClick;
+
+            Label lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(230, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent };
+            lblHot = new Label { Text = "X:", Location = new Point(230, 70), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
+            hotXNum = new NumericUpDown { Location = new Point(258, 70), Width = 60, Minimum = 0, Maximum = 255,
+                                          BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
+            lblHotY = new Label { Text = "Y:", Location = new Point(230, 95), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
+            hotYNum = new NumericUpDown { Location = new Point(258, 95), Width = 60, Minimum = 0, Maximum = 255,
+                                          BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
+
+            convertBtn = new BlackTextButton
+            {
+                Text = "Convert to CUR file",
+                Location = new Point(210, 125),
+                AutoSize = false,
+                Size = new Size(125, 30),
+                BackgroundImage = LoadControlImage("ConvertToCURfile.png"),
+                BackgroundImageLayout = ImageLayout.Stretch,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                ForeColor = Color.Black
+            };
+            convertBtn.FlatAppearance.BorderSize = 0;
             convertBtn.Click += ConvertClick;
             convertBtn.Enabled = false;
 
-            batchConvertBtn = new Button { Text = "Multi convert", Location = new Point(selectBtn.Right + 12, 12), Width = 110 };
-            batchConvertBtn.Click += BatchConvertClick;
+            batchConvertBtn = new Button
+            {
+                Text = "Multi convert",
+                Location = new Point(selectBtn.Right + 12, 12),
+                Width = 110,
+                BackgroundImage = LoadControlImage("multiConvert.png"),
+                BackgroundImageLayout = ImageLayout.Stretch,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                ForeColor = Color.Black
+            };
+            batchConvertBtn.FlatAppearance.BorderSize = 0;
+            batchConvertBtn.Click += SelectImagesForPreview;
 
             convertBtn.Location = new Point(previewBox.Left, previewBox.Bottom + 12);
 
-            Controls.AddRange(new Control[] { selectBtn, batchConvertBtn, previewBox, lblHotTitle, lblHot, hotXNum, lblHotY, hotYNum, convertBtn });
+            Controls.AddRange(new Control[] { selectBtn, batchConvertBtn, previewBox, previousImageBtn, nextImageBtn,
+                lblHotTitle, lblHot, hotXNum, lblHotY, hotYNum, convertBtn });
+            UpdateNavigationButtons();
         }
+
+        private sealed class BlackTextButton : Button
+        {
+            public BlackTextButton()
+            {
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                if (BackgroundImage != null)
+                {
+                    e.Graphics.DrawImage(BackgroundImage, ClientRectangle);
+                }
+                else
+                {
+                    e.Graphics.Clear(BackColor);
+                }
+
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    Text,
+                    Font,
+                    ClientRectangle,
+                    Color.Black,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+
+                if (Focused && ShowFocusCues)
+                {
+                    ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -3, -3));
+                }
+            }
+        }
+
+        private Image LoadControlImage(string fileName)
+        {
+            string imagePath = Path.Combine(AppContext.BaseDirectory, "imgs", fileName);
+            using Image source = Image.FromFile(imagePath);
+            Image image = new Bitmap(source);
+            controlImages.Add(image);
+            return image;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            int black = 0x000000;
+            int white = 0x00FFFFFF;
+            int captionResult = DwmSetWindowAttribute(Handle, DwmwaCaptionColor, ref black, sizeof(int));
+            int textResult = DwmSetWindowAttribute(Handle, DwmwaTextColor, ref white, sizeof(int));
+            if (captionResult != 0 || textResult != 0)
+            {
+                int enabled = 1;
+                int result = DwmSetWindowAttribute(Handle, DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+                if (result != 0)
+                {
+                    DwmSetWindowAttribute(Handle, 19, ref enabled, sizeof(int));
+                }
+            }
+        }
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int valueSize);
 
         private void SelectPng(object? sender, EventArgs e)
         {
             using var ofd = new OpenFileDialog { Filter = "PNG Image|*.png" };
             if (ofd.ShowDialog(this) != DialogResult.OK) return;
 
-            pngPath = ofd.FileName;
-            try
-            {
-                using var fs = new FileStream(ofd.FileName, FileMode.Open);
-                using var img = Image.FromStream(fs);
-                if (img.Width > MaxSize || img.Height > MaxSize)
-                {
-                    MessageBox.Show($"Image size {img.Width}x{img.Height} exceeded the maximum allowed size {MaxSize}x{MaxSize}! Please try again after resizing the image.", "[Size exceeded the limit]");
-                    pngPath = "";
-                    previewBox.Image = null;
-                    convertBtn.Enabled = false;
-                    return;
-                }
-
-                previewBox.Image = new Bitmap(img);
-                hotXNum.Maximum = Math.Min(MaxSize - 1, img.Width - 1);
-                hotYNum.Maximum = Math.Min(MaxSize - 1, img.Height - 1);
-                hotXNum.Value = img.Width / 2;
-                hotYNum.Value = img.Height / 2;
-                convertBtn.Enabled = true;
-            }
-            catch (Exception ex)
-            {
-                pngPath = "";
-                previewBox.Image = null;
-                convertBtn.Enabled = false;
-                MessageBox.Show("Error loading image: " + ex.Message, "[Error]");
-                return;
-            }
+            previewPaths = new[] { ofd.FileName };
+            previewIndex = 0;
+            ShowSelectedImage();
         }
 
         private void ConvertClick(object? sender, EventArgs e)
@@ -90,6 +210,12 @@ namespace PNG2CUR
             int imageHeight = previewBox.Image?.Height ?? 0;
             int hotX = (int)hotXNum.Value;
             int hotY = (int)hotYNum.Value;
+
+            if (imageWidth > MaxSize || imageHeight > MaxSize)
+            {
+                MessageBox.Show($"Image size {imageWidth}x{imageHeight} exceeded the maximum allowed size {MaxSize}x{MaxSize}! Please try again after resizing the image.", "[Size exceeded the limit]");
+                return;
+            }
 
             if (hotX >= imageWidth || hotY >= imageHeight)
             {
@@ -111,73 +237,89 @@ namespace PNG2CUR
             }
         }
 
-        private void BatchConvertClick(object? sender, EventArgs e)
+        private void SelectImagesForPreview(object? sender, EventArgs e)
         {
             using var ofd = new OpenFileDialog
             {
                 Filter = "PNG Image|*.png",
                 Multiselect = true,
-                Title = "Select PNG images to convert"
+                Title = "Select PNG images to preview"
             };
             if (ofd.ShowDialog(this) != DialogResult.OK) return;
 
-            using var fbd = new FolderBrowserDialog { Description = "Select the output folder for CUR files" };
-            if (fbd.ShowDialog(this) != DialogResult.OK) return;
+            previewPaths = ofd.FileNames;
+            previewIndex = 0;
+            ShowSelectedImage();
+        }
 
-            int hotX = (int)hotXNum.Value;
-            int hotY = (int)hotYNum.Value;
-            int convertedCount = 0;
-            var failures = new System.Collections.Generic.List<string>();
+        private void PreviousImageClick(object? sender, EventArgs e)
+        {
+            ChangePreview(-1);
+        }
 
-            foreach (string sourcePath in ofd.FileNames)
+        private void NextImageClick(object? sender, EventArgs e)
+        {
+            ChangePreview(1);
+        }
+
+        private void ChangePreview(int direction)
+        {
+            if (previewPaths.Length < 2) return;
+
+            previewIndex = (previewIndex + direction + previewPaths.Length) % previewPaths.Length;
+            ShowSelectedImage();
+        }
+
+        private void ShowSelectedImage()
+        {
+            UpdateNavigationButtons();
+            if (previewPaths.Length == 0)
             {
-                string fileName = Path.GetFileName(sourcePath);
-                try
-                {
-                    int imageWidth;
-                    int imageHeight;
-                    using (var image = Image.FromFile(sourcePath))
-                    {
-                        imageWidth = image.Width;
-                        imageHeight = image.Height;
-                    }
-
-                    if (imageWidth > MaxSize || imageHeight > MaxSize)
-                    {
-                        failures.Add($"{fileName}: image exceeds the maximum size of {MaxSize}x{MaxSize}.");
-                        continue;
-                    }
-
-                    if (hotX >= imageWidth || hotY >= imageHeight)
-                    {
-                        failures.Add($"{fileName}: hotspot coordinates are outside the image bounds.");
-                        continue;
-                    }
-
-                    string destinationPath = Path.Combine(fbd.SelectedPath, Path.GetFileNameWithoutExtension(sourcePath) + ".cur");
-                    if (File.Exists(destinationPath))
-                    {
-                        failures.Add($"{fileName}: output file already exists ({Path.GetFileName(destinationPath)}).");
-                        continue;
-                    }
-
-                    PngToCurConverter.Convert(sourcePath, destinationPath, hotX, hotY);
-                    convertedCount++;
-                }
-                catch (Exception ex)
-                {
-                    failures.Add($"{fileName}: {ex.Message}");
-                }
-            }
-
-            if (failures.Count == 0)
-            {
-                MessageBox.Show($"Successfully converted {convertedCount} file(s).", "[Success]");
+                pngPath = "";
+                previewBox.Image?.Dispose();
+                previewBox.Image = null;
+                convertBtn.Enabled = false;
                 return;
             }
 
-            string message = $"Converted: {convertedCount}\nFailed: {failures.Count}\n\n" + string.Join(Environment.NewLine, failures);
-            MessageBox.Show(message, "[Batch conversion results]");
+            pngPath = previewPaths[previewIndex];
+            try
+            {
+                using var image = Image.FromFile(pngPath);
+                Image previewImage = new Bitmap(image);
+                Image? previousImage = previewBox.Image;
+                previewBox.Image = previewImage;
+                previousImage?.Dispose();
+
+                hotXNum.Value = hotXNum.Minimum;
+                hotYNum.Value = hotYNum.Minimum;
+                hotXNum.Maximum = Math.Min(MaxSize - 1, image.Width - 1);
+                hotYNum.Maximum = Math.Min(MaxSize - 1, image.Height - 1);
+                hotXNum.Value = Math.Min(hotXNum.Maximum, image.Width / 2);
+                hotYNum.Value = Math.Min(hotYNum.Maximum, image.Height / 2);
+
+                bool withinLimit = image.Width <= MaxSize && image.Height <= MaxSize;
+                convertBtn.Enabled = withinLimit;
+                if (!withinLimit)
+                {
+                    MessageBox.Show($"Image size {image.Width}x{image.Height} exceeded the maximum allowed size {MaxSize}x{MaxSize}! Please try again after resizing the image.", "[Size exceeded the limit]");
+                }
+            }
+            catch (Exception ex)
+            {
+                pngPath = "";
+                previewBox.Image?.Dispose();
+                previewBox.Image = null;
+                convertBtn.Enabled = false;
+                MessageBox.Show("Error loading image: " + ex.Message, "[Error]");
+            }
+        }
+
+        private void UpdateNavigationButtons()
+        {
+            bool canNavigate = previewPaths.Length > 1;
+            previousImageBtn.Enabled = canNavigate;
+            nextImageBtn.Enabled = canNavigate;
         }
     }
 
