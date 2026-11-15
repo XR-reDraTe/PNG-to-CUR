@@ -17,11 +17,14 @@ namespace PNG2CUR
 
         private PictureBox previewBox;
         private NumericUpDown hotXNum, hotYNum;
-        private Button selectBtn, convertBtn, batchConvertBtn, previousImageBtn, nextImageBtn;
-        private Label lblHot, lblHotY;
+        private Button selectBtn, convertBtn, batchConvertBtn, previousImageBtn, nextImageBtn, settingsBtn;
+        private readonly ContextMenuStrip settingsMenu;
+        private readonly ToolStripMenuItem themeMenuItem;
+        private Label lblHotTitle, lblHot, lblHotY;
         private string pngPath = "";
         private string[] previewPaths = Array.Empty<string>();
         private int previewIndex;
+        private bool isDarkMode;
         private const int MaxSize = 256; // Windows 光标最大尺寸
 
         public Form1()
@@ -31,8 +34,13 @@ namespace PNG2CUR
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(350, 300);
             Padding = new Padding(12);
+            themeMenuItem = new ToolStripMenuItem("Switch to Dark Mode");
+            themeMenuItem.Click += (_, _) => SetDarkMode(!isDarkMode);
+            settingsMenu = new ContextMenuStrip();
+            settingsMenu.Items.Add(themeMenuItem);
             Disposed += (_, _) =>
             {
+                settingsMenu.Dispose();
                 foreach (Image image in controlImages)
                 {
                     image.Dispose();
@@ -54,14 +62,21 @@ namespace PNG2CUR
             selectBtn.Click += SelectPng;
 
             previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 12), Size = new Size(160, 160),
-                                        BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom,
+                                        BorderStyle = BorderStyle.None, SizeMode = PictureBoxSizeMode.Zoom,
                                         BackgroundImage = LoadControlImage("previewBox.png"), BackgroundImageLayout = ImageLayout.Stretch };
+            previewBox.Paint += (_, e) =>
+            {
+                Color borderColor = isDarkMode ? Color.FromArgb(100, 100, 100) : Color.FromArgb(80, 80, 80);
+                ControlPaint.DrawBorder(e.Graphics, previewBox.ClientRectangle, borderColor, ButtonBorderStyle.Solid);
+            };
 
             previousImageBtn = new Button
             {
                 Text = "↑",
                 Location = new Point(180, 82),
                 Size = new Size(32, 32),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(8, 0, 0, 0),
                 BackColor = Color.FromArgb(148, 148, 148),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -75,6 +90,8 @@ namespace PNG2CUR
                 Text = "↓",
                 Location = new Point(180, 122),
                 Size = new Size(32, 32),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(8, 0, 0, 0),
                 BackColor = Color.FromArgb(148, 148, 148),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -83,7 +100,7 @@ namespace PNG2CUR
             nextImageBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
             nextImageBtn.Click += NextImageClick;
 
-            Label lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(230, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent };
+            lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(230, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent };
             lblHot = new Label { Text = "X:", Location = new Point(230, 70), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
             hotXNum = new NumericUpDown { Location = new Point(258, 70), Width = 60, Minimum = 0, Maximum = 255,
                                           BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
@@ -121,11 +138,29 @@ namespace PNG2CUR
             batchConvertBtn.FlatAppearance.BorderSize = 0;
             batchConvertBtn.Click += SelectImagesForPreview;
 
+            settingsBtn = new Button
+            {
+                Text = "⚙",
+                Location = new Point(ClientSize.Width - Padding.Right - 25, 12),
+                Size = new Size(25, 25),
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                BackColor = Color.FromArgb(240, 240, 240),
+                ForeColor = Color.Black
+            };
+            settingsBtn.FlatAppearance.BorderSize = 0;
+            settingsBtn.ContextMenuStrip = settingsMenu;
+            settingsBtn.Click += (_, _) => settingsMenu.Show(
+                settingsBtn,
+                new Point(settingsBtn.Width, settingsBtn.Height),
+                ToolStripDropDownDirection.BelowLeft);
+
             convertBtn.Location = new Point(previewBox.Left, previewBox.Bottom + 12);
 
-            Controls.AddRange(new Control[] { selectBtn, batchConvertBtn, previewBox, previousImageBtn, nextImageBtn,
+            Controls.AddRange(new Control[] { selectBtn, batchConvertBtn, settingsBtn, previewBox, previousImageBtn, nextImageBtn,
                 lblHotTitle, lblHot, hotXNum, lblHotY, hotYNum, convertBtn });
             UpdateNavigationButtons();
+            UpdateThemeColors();
         }
 
         private sealed class BlackTextButton : Button
@@ -170,17 +205,99 @@ namespace PNG2CUR
             return image;
         }
 
+        private void SetDarkMode(bool enabled)
+        {
+            isDarkMode = enabled;
+            SetThemedImage(this, "bg.png");
+            SetThemedImage(selectBtn, "selectBtn.png");
+            SetThemedImage(batchConvertBtn, "multiConvert.png");
+            SetThemedImage(previewBox, "previewBox.png");
+            SetThemedImage(convertBtn, "convertToCURfile.png");
+            themeMenuItem.Text = isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode";
+            UpdateThemeColors();
+            UpdateTitleBarTheme();
+        }
+
+        private void UpdateThemeColors()
+        {
+            Color buttonBackColor = isDarkMode
+                ? Color.FromArgb(64, 64, 64)
+                : Color.FromArgb(240, 240, 240);
+            Color buttonBorderColor = isDarkMode
+                ? Color.FromArgb(100, 100, 100)
+                : Color.FromArgb(180, 180, 180);
+            Color buttonHoverColor = isDarkMode
+                ? Color.FromArgb(80, 80, 80)
+                : Color.FromArgb(225, 225, 225);
+            Color buttonPressedColor = isDarkMode
+                ? Color.FromArgb(48, 48, 48)
+                : Color.FromArgb(205, 205, 205);
+            Color inputForeColor = isDarkMode ? Color.White : Color.Black;
+            Color inputBackColor = isDarkMode ? buttonBackColor : Color.White;
+
+            foreach (Button button in new[] { previousImageBtn, nextImageBtn })
+            {
+                button.BackColor = buttonBackColor;
+                button.ForeColor = inputForeColor;
+                button.FlatAppearance.BorderColor = buttonBorderColor;
+                button.FlatAppearance.MouseOverBackColor = buttonHoverColor;
+                button.FlatAppearance.MouseDownBackColor = buttonPressedColor;
+            }
+
+            lblHotTitle.ForeColor = inputForeColor;
+            lblHot.ForeColor = inputForeColor;
+            lblHotY.ForeColor = inputForeColor;
+            previewBox.BackColor = isDarkMode ? Color.FromArgb(32, 32, 32) : Color.White;
+            previewBox.Invalidate();
+            settingsBtn.BackColor = buttonBackColor;
+            settingsBtn.ForeColor = inputForeColor;
+
+            foreach (NumericUpDown input in new[] { hotXNum, hotYNum })
+            {
+                input.BackColor = inputBackColor;
+                input.ForeColor = inputForeColor;
+            }
+        }
+
+        private void SetThemedImage(Control control, string lightFileName)
+        {
+            string imageFileName = lightFileName;
+            if (isDarkMode)
+            {
+                string darkFileName = Path.GetFileNameWithoutExtension(lightFileName) +
+                    "_dark" + Path.GetExtension(lightFileName);
+                string darkImagePath = Path.Combine(AppContext.BaseDirectory, "imgs", darkFileName);
+                if (File.Exists(darkImagePath))
+                {
+                    imageFileName = darkFileName;
+                }
+            }
+
+            Image newImage = LoadControlImage(imageFileName);
+            Image? previousImage = control.BackgroundImage;
+            control.BackgroundImage = newImage;
+            if (previousImage != null)
+            {
+                controlImages.Remove(previousImage);
+                previousImage.Dispose();
+            }
+        }
+
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
+            UpdateTitleBarTheme();
+        }
 
-            int black = 0x000000;
-            int white = 0x00FFFFFF;
-            int captionResult = DwmSetWindowAttribute(Handle, DwmwaCaptionColor, ref black, sizeof(int));
-            int textResult = DwmSetWindowAttribute(Handle, DwmwaTextColor, ref white, sizeof(int));
+        private void UpdateTitleBarTheme()
+        {
+            int captionColor = isDarkMode ? 0x000000 : 0x00FFFFFF;
+            int textColor = isDarkMode ? 0x00FFFFFF : 0x000000;
+            int captionResult = DwmSetWindowAttribute(Handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
+            int textResult = DwmSetWindowAttribute(Handle, DwmwaTextColor, ref textColor, sizeof(int));
             if (captionResult != 0 || textResult != 0)
             {
-                int enabled = 1;
+                int enabled = isDarkMode ? 1 : 0;
                 int result = DwmSetWindowAttribute(Handle, DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
                 if (result != 0)
                 {

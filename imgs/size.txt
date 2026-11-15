@@ -1,0 +1,4 @@
+Select PNG image: 100x23
+Multi convert: 110x23
+Convert to CUR file 125x30
+
