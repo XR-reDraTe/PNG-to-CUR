@@ -63,12 +63,15 @@ namespace PNG2CUR
 
             previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 12), Size = new Size(160, 160),
                                         BorderStyle = BorderStyle.None, SizeMode = PictureBoxSizeMode.Zoom,
+                                        Cursor = Cursors.Cross,
                                         BackgroundImage = LoadControlImage("previewBox.png"), BackgroundImageLayout = ImageLayout.Stretch };
             previewBox.Paint += (_, e) =>
             {
                 Color borderColor = isDarkMode ? Color.FromArgb(100, 100, 100) : Color.FromArgb(80, 80, 80);
                 ControlPaint.DrawBorder(e.Graphics, previewBox.ClientRectangle, borderColor, ButtonBorderStyle.Solid);
+                DrawHotspotMarker(e.Graphics);
             };
+            previewBox.MouseClick += PreviewBoxMouseClick;
 
             previousImageBtn = new Button
             {
@@ -107,6 +110,8 @@ namespace PNG2CUR
             lblHotY = new Label { Text = "Y:", Location = new Point(230, 95), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
             hotYNum = new NumericUpDown { Location = new Point(258, 95), Width = 60, Minimum = 0, Maximum = 255,
                                           BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
+            hotXNum.ValueChanged += (_, _) => previewBox.Invalidate();
+            hotYNum.ValueChanged += (_, _) => previewBox.Invalidate();
 
             convertBtn = new BlackTextButton
             {
@@ -352,6 +357,52 @@ namespace PNG2CUR
             {
                 MessageBox.Show("Failed to convert: " + ex.Message, "[Error]");
             }
+        }
+
+        private void PreviewBoxMouseClick(object? sender, MouseEventArgs e)
+        {
+            Image? image = previewBox.Image;
+            if (image == null) return;
+
+            RectangleF imageBounds = GetPreviewImageBounds(image);
+            if (!imageBounds.Contains(e.Location)) return;
+
+            int hotX = (int)((e.X - imageBounds.Left) * image.Width / imageBounds.Width);
+            int hotY = (int)((e.Y - imageBounds.Top) * image.Height / imageBounds.Height);
+            hotXNum.Value = Math.Min(hotXNum.Maximum, hotX);
+            hotYNum.Value = Math.Min(hotYNum.Maximum, hotY);
+        }
+
+        private void DrawHotspotMarker(Graphics graphics)
+        {
+            Image? image = previewBox.Image;
+            if (image == null) return;
+
+            RectangleF imageBounds = GetPreviewImageBounds(image);
+            float x = imageBounds.Left + ((float)hotXNum.Value + 0.5f) * imageBounds.Width / image.Width;
+            float y = imageBounds.Top + ((float)hotYNum.Value + 0.5f) * imageBounds.Height / image.Height;
+            const float markerRadius = 5;
+
+            using var outlinePen = new Pen(Color.White, 3);
+            using var markerPen = new Pen(Color.Red, 1.5f);
+            graphics.DrawLine(outlinePen, x - markerRadius, y, x + markerRadius, y);
+            graphics.DrawLine(outlinePen, x, y - markerRadius, x, y + markerRadius);
+            graphics.DrawLine(markerPen, x - markerRadius, y, x + markerRadius, y);
+            graphics.DrawLine(markerPen, x, y - markerRadius, x, y + markerRadius);
+        }
+
+        private RectangleF GetPreviewImageBounds(Image image)
+        {
+            float scale = Math.Min(
+                (float)previewBox.ClientSize.Width / image.Width,
+                (float)previewBox.ClientSize.Height / image.Height);
+            float width = image.Width * scale;
+            float height = image.Height * scale;
+            return new RectangleF(
+                (previewBox.ClientSize.Width - width) / 2,
+                (previewBox.ClientSize.Height - height) / 2,
+                width,
+                height);
         }
 
         private void SelectImagesForPreview(object? sender, EventArgs e)
