@@ -29,7 +29,7 @@ namespace PNG2CUR
 
         public Form1()
         {
-            Text = "[PNG to CUR Converter]";
+            Text = "PNG to CUR Converter - v1.2.2";
             BackgroundImage = LoadControlImage("bg.png");
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(350, 300);
