@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -34,7 +35,7 @@ namespace PNG2CUR
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(350, 300);
             Padding = new Padding(12);
-            themeMenuItem = new ToolStripMenuItem("Switch to Dark Mode");
+            themeMenuItem = new ToolStripMenuItem("Dark Mode");
             themeMenuItem.Click += (_, _) => SetDarkMode(!isDarkMode);
             settingsMenu = new ContextMenuStrip();
             settingsMenu.Items.Add(themeMenuItem);
@@ -61,25 +62,20 @@ namespace PNG2CUR
             selectBtn.FlatAppearance.BorderSize = 0;
             selectBtn.Click += SelectPng;
 
-            previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 12), Size = new Size(160, 160),
+            previewBox = new PictureBox { Location = new Point(12, selectBtn.Bottom + 6), Size = new Size(160, 160),
                                         BorderStyle = BorderStyle.None, SizeMode = PictureBoxSizeMode.Zoom,
                                         Cursor = Cursors.Cross,
                                         BackgroundImage = LoadControlImage("previewBox.png"), BackgroundImageLayout = ImageLayout.Stretch };
             previewBox.Paint += (_, e) =>
             {
-                Color borderColor = isDarkMode ? Color.FromArgb(100, 100, 100) : Color.FromArgb(80, 80, 80);
-                ControlPaint.DrawBorder(e.Graphics, previewBox.ClientRectangle, borderColor, ButtonBorderStyle.Solid);
                 DrawHotspotMarker(e.Graphics);
             };
             previewBox.MouseClick += PreviewBoxMouseClick;
 
-            previousImageBtn = new Button
+            previousImageBtn = new NavigationButton(true)
             {
-                Text = "↑",
-                Location = new Point(180, 82),
-                Size = new Size(32, 32),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(8, 0, 0, 0),
+                Location = new Point(178, previewBox.Top + previewBox.Height / 2 - 28),
+                Size = new Size(24, 24),
                 BackColor = Color.FromArgb(148, 148, 148),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -88,13 +84,10 @@ namespace PNG2CUR
             previousImageBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
             previousImageBtn.Click += PreviousImageClick;
 
-            nextImageBtn = new Button
+            nextImageBtn = new NavigationButton(false)
             {
-                Text = "↓",
-                Location = new Point(180, 122),
-                Size = new Size(32, 32),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(8, 0, 0, 0),
+                Location = new Point(178, previewBox.Top + previewBox.Height / 2 + 4),
+                Size = new Size(24, 24),
                 BackColor = Color.FromArgb(148, 148, 148),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -103,12 +96,12 @@ namespace PNG2CUR
             nextImageBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
             nextImageBtn.Click += NextImageClick;
 
-            lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(230, 45), AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent };
-            lblHot = new Label { Text = "X:", Location = new Point(230, 70), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
-            hotXNum = new NumericUpDown { Location = new Point(258, 70), Width = 60, Minimum = 0, Maximum = 255,
+            lblHotTitle = new Label { Text = "Hotspot:", Location = new Point(206, 40), AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent };
+            lblHot = new Label { Text = "X:", Location = new Point(206, 65), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
+            hotXNum = new NumericUpDown { Location = new Point(226, 65), Width = 60, Minimum = 0, Maximum = 255,
                                           BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
-            lblHotY = new Label { Text = "Y:", Location = new Point(230, 95), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
-            hotYNum = new NumericUpDown { Location = new Point(258, 95), Width = 60, Minimum = 0, Maximum = 255,
+            lblHotY = new Label { Text = "Y:", Location = new Point(206, 90), AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent };
+            hotYNum = new NumericUpDown { Location = new Point(226, 90), Width = 60, Minimum = 0, Maximum = 255,
                                           BackColor = Color.FromArgb(148, 148, 148), ForeColor = Color.Black };
             hotXNum.ValueChanged += (_, _) => previewBox.Invalidate();
             hotYNum.ValueChanged += (_, _) => previewBox.Invalidate();
@@ -201,6 +194,51 @@ namespace PNG2CUR
             }
         }
 
+        private sealed class NavigationButton : Button
+        {
+            private readonly bool pointsUp;
+            private Color arrowColor = Color.Black;
+
+            public void SetArrowColor(Color color)
+            {
+                arrowColor = color;
+                Invalidate();
+            }
+
+            public NavigationButton(bool pointsUp)
+            {
+                this.pointsUp = pointsUp;
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+                float halfSize = Math.Min(ClientSize.Width, ClientSize.Height) * 0.2f;
+                float centerX = ClientSize.Width / 2f;
+                float centerY = ClientSize.Height / 2f;
+                PointF[] points = pointsUp
+                    ? new[]
+                    {
+                        new PointF(centerX, centerY - halfSize),
+                        new PointF(centerX + halfSize, centerY + halfSize),
+                        new PointF(centerX - halfSize, centerY + halfSize)
+                    }
+                    : new[]
+                    {
+                        new PointF(centerX - halfSize, centerY - halfSize),
+                        new PointF(centerX + halfSize, centerY - halfSize),
+                        new PointF(centerX, centerY + halfSize)
+                    };
+                SmoothingMode previousSmoothingMode = e.Graphics.SmoothingMode;
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen pen = new Pen(arrowColor, Math.Max(1f, halfSize / 5f)))
+                {
+                    e.Graphics.DrawPolygon(pen, points);
+                }
+                e.Graphics.SmoothingMode = previousSmoothingMode;
+            }
+        }
+
         private Image LoadControlImage(string fileName)
         {
             string imagePath = Path.Combine(AppContext.BaseDirectory, "imgs", fileName);
@@ -218,7 +256,7 @@ namespace PNG2CUR
             SetThemedImage(batchConvertBtn, "multiConvert.png");
             SetThemedImage(previewBox, "previewBox.png");
             SetThemedImage(convertBtn, "convertToCURfile.png");
-            themeMenuItem.Text = isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode";
+            themeMenuItem.Text = isDarkMode ? "Light Mode" : "Dark Mode";
             UpdateThemeColors();
             UpdateTitleBarTheme();
         }
@@ -239,11 +277,15 @@ namespace PNG2CUR
                 : Color.FromArgb(205, 205, 205);
             Color inputForeColor = isDarkMode ? Color.White : Color.Black;
             Color inputBackColor = isDarkMode ? buttonBackColor : Color.White;
+            Color navigationArrowColor = isDarkMode
+                ? Color.White
+                : Color.Black;
 
-            foreach (Button button in new[] { previousImageBtn, nextImageBtn })
+            foreach (NavigationButton button in new[] { previousImageBtn, nextImageBtn })
             {
                 button.BackColor = buttonBackColor;
                 button.ForeColor = inputForeColor;
+                button.SetArrowColor(navigationArrowColor);
                 button.FlatAppearance.BorderColor = buttonBorderColor;
                 button.FlatAppearance.MouseOverBackColor = buttonHoverColor;
                 button.FlatAppearance.MouseDownBackColor = buttonPressedColor;
@@ -252,6 +294,8 @@ namespace PNG2CUR
             lblHotTitle.ForeColor = inputForeColor;
             lblHot.ForeColor = inputForeColor;
             lblHotY.ForeColor = inputForeColor;
+            selectBtn.ForeColor = inputForeColor;
+            batchConvertBtn.ForeColor = inputForeColor;
             previewBox.BackColor = isDarkMode ? Color.FromArgb(32, 32, 32) : Color.White;
             previewBox.Invalidate();
             settingsBtn.BackColor = buttonBackColor;
